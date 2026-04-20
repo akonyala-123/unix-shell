@@ -6,6 +6,16 @@
 
 #define MAX_ARGS 64
 
+void parse(char* input, char** args) {
+    int i = 0; 
+    char* token = strtok(input, " ");
+    while (token != nullptr) {
+        args[i++] = token; 
+        token = strtok(nullptr, " ");
+    }
+    args[i] = nullptr; 
+}
+
 int main() {
     std::string input; 
 
