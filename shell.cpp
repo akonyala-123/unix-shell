@@ -16,6 +16,20 @@ void parse(char* input, char** args) {
     args[i] = nullptr; 
 }
 
+void execute(char** args) {
+    pid_t pid = fork(); 
+    //Child process will execute the terminal command 
+    if (pid == 0) { 
+        execvp(args[0], args);
+        std::cerr << "mysh: command not found: " << args[0] << std::endl; 
+        exit(1);
+    } else if (pid > 0) {
+        wait(nullptr);
+    } else { 
+        std::cerr << "fork failed" << std::endl;
+    }
+}
+
 int main() {
     std::string input; 
 
@@ -33,10 +47,7 @@ int main() {
         strcpy(buf, input.c_str());
         char* args[MAX_ARGS]; 
         parse(buf, args);
-
-        for (int i = 0; args[i] != nullptr; i++) {
-            std::cout << "arg[" << i << "] = " << args[i] << std::endl;
-        } 
+        execute(args);
     }
     std::cout << "goodbye\n"; 
     return 0; 
