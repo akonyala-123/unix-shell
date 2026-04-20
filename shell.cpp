@@ -27,7 +27,16 @@ int main() {
         if (input.empty()) {
             continue; 
         }
-        std::cout << "got: " << input << std::endl; 
+
+        //Copy input into char array since parse will modify the string
+        char buf[1024];
+        strcpy(buf, input.c_str());
+        char* args[MAX_ARGS]; 
+        parse(buf, args);
+
+        for (int i = 0; args[i] != nullptr; i++) {
+            std::cout << "arg[" << i << "] = " << args[i] << std::endl;
+        } 
     }
     std::cout << "goodbye\n"; 
     return 0; 
