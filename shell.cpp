@@ -49,6 +49,39 @@ bool handle_builtin(char** args) {
     return false; 
 }
 
+void execute_pipe(char** args1, char** args2) {
+    int fd[2];
+    pipe(fd);
+    //fd[0] -> read end 
+    //fd[1] -> write end 
+
+    //fork child 1 - LHS of pipe 
+    pid_t pid1 = fork(); 
+    if (pid1 == 0) {
+        dup2(fd[1], 1); //Overwrite fd 1 to point to pipe 
+        close(fd[0]);   //Don't need write end of pipe 
+        close(fd[1]);   //Close fd[1] -> can only have one fd pointing to endpoint
+        execvp(args1[0], args1);
+        std::cerr << "mysh: command not found: " << args1[0] << std:: endl; 
+        exit(1);
+    }
+
+    //fork child 2 - RHS of pipe 
+    pid_t pid2 = fork();
+    if (pid2 == 0) {
+        dup2(fd[0], 0);
+        close(fd[1]);
+        close(fd[0]);
+        execvp(args2[0], args2);
+        std::cerr << "mysh: command not found: " << args2[0] << std::endl;
+        exit(1);
+    }
+    close(fd[0]);
+    close(fd[1]);
+    wait(nullptr);
+    wait(nullptr);
+}
+
 int main() {
     std::string input; 
 
@@ -64,10 +97,22 @@ int main() {
         //Copy input into char array since parse will modify the string
         char buf[1024];
         strcpy(buf, input.c_str());
-        char* args[MAX_ARGS]; 
-        parse(buf, args);
-        if (!handle_builtin(args)) {
-            execute(args);
+        char* pipe_pos = strchr(buf, '|');
+        if (pipe_pos != nullptr) {
+            *pipe_pos = '\0';
+            char* left = buf; 
+            char* right = pipe_pos + 1; 
+            char* args1[MAX_ARGS];
+            char* args2[MAX_ARGS];
+            parse(left, args1);
+            parse(right, args2);
+            execute_pipe(args1, args2);
+        } else {
+            char* args[MAX_ARGS]; 
+            parse(buf, args);
+            if (!handle_builtin(args)) {
+                execute(args);
+            }
         }
     }
     std::cout << "goodbye\n"; 
