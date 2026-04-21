@@ -30,6 +30,25 @@ void execute(char** args) {
     }
 }
 
+bool handle_builtin(char** args) {
+    //exit case 
+    if (strcmp(args[0], "exit") == 0) {
+        exit(0);
+    }
+    //cd case
+    if (strcmp(args[0], "cd") == 0) {
+        if (args[1] == nullptr) {
+            chdir(getenv("HOME"));
+        } else {
+            if (chdir(args[1]) != 0) {
+                std::cerr << "mysh: cd: no such file or directory: " << args[1] << std::endl; 
+            }
+        }
+        return true; 
+    }
+    return false; 
+}
+
 int main() {
     std::string input; 
 
@@ -47,7 +66,9 @@ int main() {
         strcpy(buf, input.c_str());
         char* args[MAX_ARGS]; 
         parse(buf, args);
-        execute(args);
+        if (!handle_builtin(args)) {
+            execute(args);
+        }
     }
     std::cout << "goodbye\n"; 
     return 0; 
