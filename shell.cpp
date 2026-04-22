@@ -16,7 +16,7 @@ void parse(char* input, char** args) {
     args[i] = nullptr; 
 }
 
-void execute(char** args) {
+void execute(char** args, bool background = false) {
     pid_t pid = fork(); 
     //Child process will execute the terminal command 
     if (pid == 0) { 
@@ -24,7 +24,11 @@ void execute(char** args) {
         std::cerr << "mysh: command not found: " << args[0] << std::endl; 
         exit(1);
     } else if (pid > 0) {
-        wait(nullptr);
+        if (!background) {
+            wait(nullptr);
+        } else { 
+            std::cout << "[" << pid << "]" << " running in the backgorund" << std::endl; 
+        }
     } else { 
         std::cerr << "fork failed" << std::endl;
     }
@@ -158,8 +162,17 @@ int main() {
         } else {
             char* args[MAX_ARGS]; 
             parse(buf, args);
+
+            //check for background 
+            bool background = false; 
+            int i = 0; 
+            while (args[i] != nullptr) i++; 
+            if (i > 0 && strcmp(args[i - 1], "&") == 0) {
+                background = true; 
+                args[i - 1] = nullptr; 
+            }
             if (!handle_builtin(args)) {
-                execute(args);
+                execute(args, background);
             }
         }
     }
