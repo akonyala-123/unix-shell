@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <cstring>
-
+#include <fcntl.h>
 #define MAX_ARGS 64
 
 void parse(char* input, char** args) {
@@ -82,6 +82,36 @@ void execute_pipe(char** args1, char** args2) {
     wait(nullptr);
 }
 
+void execute_redirect(char** args, char* filename, bool is_output) {
+    pid_t pid = fork(); 
+    if (pid == 0) {
+        if (is_output) { //Writing to file 
+            int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644); 
+            if (fd < 0) {
+                std::cerr << "mysh: cannot open file: " << filename << std::endl; 
+                exit(1);
+            }
+            dup2(fd, 1);
+            close(fd);
+        } else {         //Reading from file 
+            int fd = open(filename, O_RDONLY); 
+            if (fd < 0) {
+                std::cerr << "mysh: cannot open file: " << filename << std::endl;
+                exit(1);
+            }
+            dup2(fd, 0); 
+            close(fd);
+        }
+        execvp(args[0], args);
+        std::cerr << "mysh: cannot open file: " << filename << std::endl;
+        exit(1);
+    } else if (pid > 0) {
+        wait(nullptr);
+    } else { 
+        std::cerr << "fork failed" << std::endl; 
+    }
+}
+
 int main() {
     std::string input; 
 
@@ -97,8 +127,26 @@ int main() {
         //Copy input into char array since parse will modify the string
         char buf[1024];
         strcpy(buf, input.c_str());
+
+        //Check for redirection and pipe 
+        char* out_pos = strchr(buf, '>');
+        char* in_pos = strchr(buf, '<');
         char* pipe_pos = strchr(buf, '|');
-        if (pipe_pos != nullptr) {
+        if (out_pos != nullptr) {
+            *out_pos = '\0';
+            char* filename = out_pos + 1; 
+            while (*filename == ' ') filename++; 
+            char* args[MAX_ARGS];
+            parse(buf, args);
+            execute_redirect(args, filename, true);
+        } else if (in_pos != nullptr) {
+            *in_pos = '\0';
+            char* filename = in_pos + 1; 
+            while (*filename == ' ') filename++; 
+            char* args[MAX_ARGS];
+            parse(buf, args);
+            execute_redirect(args, filename, false);
+        } else if (pipe_pos != nullptr) {
             *pipe_pos = '\0';
             char* left = buf; 
             char* right = pipe_pos + 1; 
