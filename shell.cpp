@@ -27,7 +27,7 @@ void execute(char** args, bool background = false) {
         if (!background) {
             wait(nullptr);
         } else { 
-            std::cout << "[" << pid << "]" << " running in the backgorund" << std::endl; 
+            std::cout << "[" << pid << "]" << " running in the background" << std::endl; 
         }
     } else { 
         std::cerr << "fork failed" << std::endl;
@@ -53,7 +53,7 @@ bool handle_builtin(char** args) {
     return false; 
 }
 
-void execute_pipe(char** args1, char** args2) {
+void execute_pipe(char** args1, char** args2, bool background = false) {
     int fd[2];
     pipe(fd);
     //fd[0] -> read end 
@@ -82,11 +82,15 @@ void execute_pipe(char** args1, char** args2) {
     }
     close(fd[0]);
     close(fd[1]);
-    wait(nullptr);
-    wait(nullptr);
+    if (!background) {
+        wait(nullptr);
+        wait(nullptr);
+    } else {
+        std::cout << "[background] pipe running" << std::endl;
+    }
 }
 
-void execute_redirect(char** args, char* filename, bool is_output) {
+void execute_redirect(char** args, char* filename, bool is_output, bool background) {
     pid_t pid = fork(); 
     if (pid == 0) {
         if (is_output) { //Writing to file 
@@ -110,7 +114,11 @@ void execute_redirect(char** args, char* filename, bool is_output) {
         std::cerr << "mysh: cannot open file: " << filename << std::endl;
         exit(1);
     } else if (pid > 0) {
-        wait(nullptr);
+        if (!background) {
+            wait(nullptr);
+        } else {
+            std::cout << "[" << pid << "] running in background" << std::endl;
+        }
     } else { 
         std::cerr << "fork failed" << std::endl; 
     }
@@ -132,6 +140,19 @@ int main() {
         char buf[1024];
         strcpy(buf, input.c_str());
 
+        //Check for background job 
+        bool background = false;
+        int len = strlen(buf);
+        if (len > 0 && buf[len-1] == '&') {
+            background = true;
+            buf[len-1] = '\0';  // remove & from buf
+            // trim trailing space if any
+            len = strlen(buf);
+            if (len > 0 && buf[len-1] == ' ') {
+                buf[len-1] = '\0';
+            }
+        }
+
         //Check for redirection and pipe 
         char* out_pos = strchr(buf, '>');
         char* in_pos = strchr(buf, '<');
@@ -142,14 +163,14 @@ int main() {
             while (*filename == ' ') filename++; 
             char* args[MAX_ARGS];
             parse(buf, args);
-            execute_redirect(args, filename, true);
+            execute_redirect(args, filename, true, background);
         } else if (in_pos != nullptr) {
             *in_pos = '\0';
             char* filename = in_pos + 1; 
             while (*filename == ' ') filename++; 
             char* args[MAX_ARGS];
             parse(buf, args);
-            execute_redirect(args, filename, false);
+            execute_redirect(args, filename, false, background);
         } else if (pipe_pos != nullptr) {
             *pipe_pos = '\0';
             char* left = buf; 
@@ -158,19 +179,10 @@ int main() {
             char* args2[MAX_ARGS];
             parse(left, args1);
             parse(right, args2);
-            execute_pipe(args1, args2);
+            execute_pipe(args1, args2, background);
         } else {
             char* args[MAX_ARGS]; 
             parse(buf, args);
-
-            //check for background 
-            bool background = false; 
-            int i = 0; 
-            while (args[i] != nullptr) i++; 
-            if (i > 0 && strcmp(args[i - 1], "&") == 0) {
-                background = true; 
-                args[i - 1] = nullptr; 
-            }
             if (!handle_builtin(args)) {
                 execute(args, background);
             }
